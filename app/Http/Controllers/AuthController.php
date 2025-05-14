@@ -15,31 +15,45 @@ class AuthController extends Controller
             'name' => 'required|string|max:100',
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6',
-            'role' => 'in:student,teacher',
+            'role' => 'in:admin,teacher,student',
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'] ?? 'student',
         ]);
 
-        return response()->json(['message' => 'Inscription réussie'], 201);
+        return response()->json([
+            'message' => 'Inscription réussie',
+            'role' => $user->role
+        ], 201);
     }
 
     public function login(Request $request)
     {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string|min:6',
+        ]);
+
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json(['message' => 'Identifiants invalides'], 401);
         }
 
-        return response()->json(['message' => 'Connexion réussie'], 200);
+        $user = Auth::user();
+
+        return response()->json([
+            'message' => 'Connexion réussie',
+            'role' => $user->role
+        ], 200);
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
         Auth::logout();
+
         return response()->json(['message' => 'Déconnexion réussie']);
     }
 }
