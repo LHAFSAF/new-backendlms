@@ -17,11 +17,32 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
+  protected $fillable = [
+    'name', 'email', 'password', 'role', 'api_token',
+];
+
+public function courses()
+{
+    return $this->belongsToMany(Course::class, 'course_user')->withTimestamps();
+}
+
+public function modules()
+{
+    return $this->belongsToMany(Module::class, 'module_user')->withTimestamps();
+}
+public function enrolledCourses()
+{
+    return $this->belongsToMany(Course::class, 'course_user')->withTimestamps();
+}
+public function completedModules()
+{
+    return $this->belongsToMany(Module::class, 'module_user')->withTimestamps();
+}
+public function completedResources()
+{
+    return $this->belongsToMany(\App\Models\Resource::class, 'resource_user')->withTimestamps();
+}
+
 
     /**
      * The attributes that should be hidden for serialization.

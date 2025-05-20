@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Support\Str;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    // 🔐 Inscription
     public function register(Request $request)
     {
         $validated = $request->validate([
@@ -31,29 +32,48 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function login(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string|min:6',
-        ]);
+    // 🔐 Connexion avec session Sanctum
+  
+public function login(Request $request)
+{
+    $request->validate([
+        'email' => 'required|email',
+        'password' => 'required|string|min:6',
+    ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json(['message' => 'Identifiants invalides'], 401);
-        }
+    $user = User::where('email', $request->email)->first();
 
-        $user = Auth::user();
-
-        return response()->json([
-            'message' => 'Connexion réussie',
-            'role' => $user->role
-        ], 200);
+    if (!$user || !Hash::check($request->password, $user->password)) {
+        return response()->json(['message' => 'Identifiants invalides'], 401);
     }
 
-    public function logout(Request $request)
-    {
-        Auth::logout();
+    // ✅ Générer un token aléatoire et le stocker dans la DB
+    $token = Str::random(60);
+$user->api_token = $token; 
+    $user->save();
 
-        return response()->json(['message' => 'Déconnexion réussie']);
+    return response()->json([
+        'message' => 'Connexion réussie',
+        'role' => $user->role,
+        'name' => $user->name,
+        'token' => $token // le vrai token brut
+    ]);
+}
+    // 🔐 Déconnexion
+public function logout(Request $request)
+{
+    $user = $request->user();
+    if ($user) {
+        $user->api_token = null; 
+        $user->save();
+    }
+
+    return response()->json(['message' => 'Déconnexion réussie']);
+}
+
+    // 🔎 Récupérer l'utilisateur connecté
+    public function me(Request $request)
+    {
+        return response()->json($request->user());
     }
 }

@@ -17,4 +17,9 @@ class Module extends Model
     {
         return $this->hasMany(Resource::class);
     }
+    public function completedByUsers()
+{
+    return $this->belongsToMany(User::class, 'module_user')->withTimestamps();
+}
+
 }

@@ -1,66 +1,81 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Course;
-use App\Models\Module;
-use App\Models\Resource;
 use Illuminate\Http\Request;
 
 class CourseController extends Controller
 {
-    // 📋 Afficher tous les cours avec leurs modules et ressources
-    public function index()
+    public function index(Request $request)
     {
-        return Course::with(['teacher', 'modules.resources'])->orderBy('created_at', 'desc')->get();
+        $query = Course::with(['teacher', 'modules.resources']);
+
+        if ($request->has('search')) {
+            $query->where('title', 'like', '%' . $request->search . '%');
+        }
+
+        return $query->orderBy('created_at', 'desc')->get();
     }
 
-    // ➕ Créer un nouveau cours
+    public function show($id)
+    {
+        $course = Course::with(['teacher', 'modules.resources'])->findOrFail($id);
+
+        foreach ($course->modules as $module) {
+            if (!isset($module->resources)) {
+                $module->resources = [];
+            }
+        }
+
+        return response()->json($course);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title'       => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category' => 'nullable|string|max:100',
-            'teacher_id' => 'nullable|exists:users,id',
+            'category'    => 'nullable|string|max:100',
+            'teacher_id'  => 'nullable|exists:users,id',
+            'image'       => 'nullable|image|max:2048',
         ]);
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('courses', 'public');
+            $validated['image'] = '/storage/' . $path;
+        }
 
         $course = Course::create($validated);
         return response()->json($course, 201);
     }
 
-    // ➕ Ajouter un module à un cours
-    public function addModule(Request $request, $courseId)
+    public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'order_index' => 'nullable|integer'
+            'title'       => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'category'    => 'nullable|string|max:100',
+            'teacher_id'  => 'nullable|exists:users,id',
+            'image'       => 'nullable|image|max:2048',
         ]);
 
-        $module = Module::create([
-            'title' => $validated['title'],
-            'order_index' => $validated['order_index'] ?? 0,
-            'course_id' => $courseId,
-        ]);
+        $course = Course::findOrFail($id);
 
-        return response()->json($module, 201);
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('courses', 'public');
+            $validated['image'] = '/storage/' . $path;
+        }
+
+        $course->update($validated);
+        return response()->json($course);
     }
 
-    // ➕ Ajouter une ressource à un module
-    public function addResource(Request $request, $moduleId)
+    public function destroy($id)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'type' => 'required|in:video,pdf,link,text',
-            'content' => 'nullable|string',
-        ]);
+        $course = Course::findOrFail($id);
+        $course->delete();
 
-        $resource = Resource::create([
-            'title' => $validated['title'],
-            'type' => $validated['type'],
-            'content' => $validated['content'],
-            'module_id' => $moduleId,
-        ]);
-
-        return response()->json($resource, 201);
+        return response()->json(['message' => 'Cours supprimé avec succès']);
     }
 }

@@ -8,22 +8,24 @@ use Illuminate\Support\Facades\Storage;
 
 class ResourceController extends Controller
 {
-    // 📋 Lister les ressources d’un module
-    public function index($moduleId)
+    public function index(Request $request, $moduleId)
     {
-        return Resource::where('module_id', $moduleId)
-            ->orderBy('created_at')
-            ->get();
+        $query = Resource::where('module_id', $moduleId);
+
+        if ($request->has('search')) {
+            $query->where('title', 'like', '%' . $request->search . '%');
+        }
+
+        return $query->orderBy('created_at')->get();
     }
 
-    // ➕ Ajouter une ressource
     public function store(Request $request, $moduleId)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'type' => 'required|in:video,pdf,link,text,image,youtube',
+            'title'   => 'required|string|max:255',
+            'type'    => 'required|in:video,pdf,link,text,image,youtube',
             'content' => 'nullable|string',
-            'file' => 'nullable|file|mimes:mp4,pdf,jpg,jpeg,png|max:20480',
+            'file'    => 'nullable|file|mimes:mp4,pdf,jpg,jpeg,png|max:102400',
         ]);
 
         $resource = new Resource();
@@ -31,23 +33,52 @@ class ResourceController extends Controller
         $resource->title = $validated['title'];
         $resource->type = $validated['type'];
 
-        // 🗂️ Si fichier à uploader
-        if ($request->hasFile('file') && in_array($validated['type'], ['video', 'pdf', 'image'])) {
+        if (
+            $request->hasFile('file') &&
+            in_array($validated['type'], ['video', 'pdf', 'image'])
+        ) {
             $path = $request->file('file')->store('resources', 'public');
             $resource->content = '/storage/' . $path;
+        } elseif (isset($validated['content'])) {
+            $resource->content = $validated['content'];
         } else {
-            // 🌐 Cas texte, lien, YouTube
-            $resource->content = $validated['content'] ?? null;
+            return response()->json(['message' => 'Aucun contenu fourni.'], 422);
         }
 
         $resource->save();
 
         return response()->json($resource, 201);
-        dd($validated);
-
     }
 
-    // ❌ Supprimer une ressource
+    public function show($id)
+    {
+        return Resource::findOrFail($id);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $resource = Resource::findOrFail($id);
+
+        $validated = $request->validate([
+            'title'   => 'required|string|max:255',
+            'type'    => 'required|in:video,pdf,link,text,image,youtube',
+            'content' => 'nullable|string',
+            'file'    => 'nullable|file|mimes:mp4,pdf,jpg,jpeg,png|max:102400',
+        ]);
+
+        if (
+            $request->hasFile('file') &&
+            in_array($validated['type'], ['video', 'pdf', 'image'])
+        ) {
+            $path = $request->file('file')->store('resources', 'public');
+            $validated['content'] = '/storage/' . $path;
+        }
+
+        $resource->update($validated);
+
+        return response()->json($resource);
+    }
+
     public function destroy($id)
     {
         $resource = Resource::findOrFail($id);
